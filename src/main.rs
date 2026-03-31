@@ -1,4 +1,8 @@
+mod fly;
+mod renderer;
+
 use eframe::egui;
+use fly::Fly;
 
 fn main() -> Result<(), eframe::Error> {
     let options = eframe::NativeOptions {
@@ -15,97 +19,58 @@ fn main() -> Result<(), eframe::Error> {
         "Annoying Fly",
         options,
         Box::new(|cc| {
-            // Force a light/visible style so we can see what renders
             cc.egui_ctx.set_visuals(egui::Visuals::light());
-            Ok(Box::new(FlyApp::default()))
+            Ok(Box::new(FlyApp::new()))
         }),
     )
 }
 
 struct FlyApp {
-    fly_x: f32,
-    fly_y: f32,
-    target_x: f32,
-    target_y: f32,
+    fly: Fly,
 }
 
-impl Default for FlyApp {
-    fn default() -> Self {
+impl FlyApp {
+    fn new() -> Self {
         Self {
-            fly_x: 400.0,
-            fly_y: 300.0,
-            target_x: 400.0,
-            target_y: 300.0,
+            fly: Fly::new(400.0, 300.0),
         }
     }
 }
 
 impl eframe::App for FlyApp {
-    fn update(&mut self, ctx: &egui::Context, frame: &mut eframe::Frame) {
-        // Get cursor position relative to this window (works on Wayland + X11)
-        if let Some(pos) = ctx.input(|i| i.pointer.latest_pos()) {
-            self.target_x = pos.x;
-            self.target_y = pos.y;
+    fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
+        let dt = ctx.input(|i| i.unstable_dt).min(0.05);
+
+        // Ctrl+Shift+A toggles Companion ↔ Chaos
+        if ctx.input(|i| i.key_pressed(egui::Key::A) && i.modifiers.ctrl && i.modifiers.shift) {
+            self.fly.toggle_mode();
         }
 
-        self.update_fly_position();
+        // Keep fly aware of viewport size (for off-screen entry/exit)
+        if let Some(rect) = ctx.input(|i| i.viewport().inner_rect) {
+            self.fly.set_viewport(rect.width(), rect.height());
+        }
+
+        // Feed cursor position into fly
+        if let Some(pos) = ctx.input(|i| i.pointer.latest_pos()) {
+            self.fly.set_target(pos.x, pos.y);
+        }
+
+        self.fly.update(dt);
 
         egui::CentralPanel::default().show(ctx, |ui| {
-            ui.heading("Annoying Fly Debug");
-            ui.label(format!("Mouse: {:.0}, {:.0}", self.target_x, self.target_y));
-            ui.label(format!("Fly pos: {:.1}, {:.1}", self.fly_x, self.fly_y));
+            ui.label(format!(
+                "Mode: {:?}  State: {:?}  |  Ctrl+Shift+A to toggle",
+                self.fly.mode, self.fly.state,
+            ));
+            ui.label(format!(
+                "Cursor ({:.0},{:.0})  Fly ({:.0},{:.0})  Scale {:.2}",
+                self.fly.target_x, self.fly.target_y, self.fly.x, self.fly.y, self.fly.scale,
+            ));
 
-            ui.separator();
-
-            self.draw_fly(ui);
+            renderer::draw_fly(&self.fly, ui.painter());
 
             ctx.request_repaint();
         });
-
-        let _ = frame;
-
-    }
-}
-
-impl FlyApp {
-    fn update_fly_position(&mut self) {
-        let dx = self.target_x - self.fly_x;
-        let dy = self.target_y - self.fly_y;
-        self.fly_x += dx * 0.08;
-        self.fly_y += dy * 0.08;
-    }
-
-    fn draw_fly(&self, ui: &mut egui::Ui) {
-        let painter = ui.painter();
-
-        // Use actual fly position (was hardcoded before — that was the bug)
-        let fly_pos = egui::pos2(self.fly_x, self.fly_y);
-        let fly_size = 30.0;
-
-        // Wings (behind body)
-        painter.circle_filled(
-            egui::pos2(fly_pos.x - 15.0, fly_pos.y - 8.0),
-            12.0,
-            egui::Color32::from_rgba_unmultiplied(180, 180, 200, 200),
-        );
-        painter.circle_filled(
-            egui::pos2(fly_pos.x + 15.0, fly_pos.y - 8.0),
-            12.0,
-            egui::Color32::from_rgba_unmultiplied(180, 180, 200, 200),
-        );
-
-        // Body
-        painter.circle_filled(
-            fly_pos,
-            fly_size / 2.0,
-            egui::Color32::from_rgb(30, 30, 30),
-        );
-
-        // Eyes
-        for sign in [-1.0_f32, 1.0] {
-            let eye = egui::pos2(fly_pos.x + sign * 5.0, fly_pos.y - 3.0);
-            painter.circle_filled(eye, 3.0, egui::Color32::WHITE);
-            painter.circle_filled(eye, 1.5, egui::Color32::BLACK);
-        }
     }
 }
