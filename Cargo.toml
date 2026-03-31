@@ -1,0 +1,26 @@
+[package]
+name = "annoying-fly"
+version = "0.1.0"
+edition = "2021"
+authors = ["Zagot"]
+description = "An annoying virtual fly that follows your cursor everywhere"
+
+[dependencies]
+# GUI framework - egui is pure Rust, cross-platform
+eframe = { version = "0.28", default-features = true, features = ["default_fonts"] }
+egui = "0.28"
+
+# Random number generation for fly behavior
+rand = "0.8"
+
+[profile.dev]
+# Fast compile times for development
+opt-level = 0
+
+[profile.release]
+# Optimize for size and speed
+opt-level = "z"     # Optimize for binary size
+lto = true          # Link-time optimization
+codegen-units = 1   # Better optimization but slower compile
+strip = true        # Strip symbols from binary
+panic = "abort"     # Smaller binary, no unwinding
