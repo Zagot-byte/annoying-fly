@@ -16,6 +16,9 @@ rand = "0.8"
 # PNG decoding for sprites
 image = { version = "0.24", features = ["png"] }
 
+# OS-level cursor control (cursor drift when landed)
+enigo = "0.2"
+
 [profile.dev]
 # Fast compile times for development
 opt-level = 0

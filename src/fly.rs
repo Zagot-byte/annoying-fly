@@ -49,7 +49,7 @@ impl Fly {
             y,
             target_x: x,
             target_y: y,
-            mode: FlyMode::Companion,
+            mode: FlyMode::Chaos,
             state: FlyState::Flying,
             wing_phase: 0.0,
             scale: 1.0,
@@ -69,7 +69,7 @@ impl Fly {
             FlyMode::Companion => FlyMode::Chaos,
             FlyMode::Chaos => FlyMode::Companion,
         };
-        self.land_timer = rng().gen_range(3.0..8.0);
+        self.land_timer = rng().gen_range(1.5..4.0);
     }
 
     pub fn set_viewport(&mut self, w: f32, h: f32) {
@@ -145,7 +145,7 @@ impl Fly {
                     self.land_timer -= dt;
                     if self.land_timer <= 0.0 {
                         self.state = FlyState::Landing;
-                        self.land_timer = rng().gen_range(3.0..8.0);
+                        self.land_timer = rng().gen_range(1.5..4.0);
                     }
                 }
             }
@@ -158,8 +158,8 @@ impl Fly {
                     self.state = FlyState::Landed;
                     self.landed_timer = 0.0;
                 } else {
-                    self.x += dx * 0.15;
-                    self.y += dy * 0.15;
+                    self.x += dx * 0.40;
+                    self.y += dy * 0.40;
                 }
             }
 
@@ -169,7 +169,7 @@ impl Fly {
                 self.landed_timer += dt;
 
                 // Bigger fly needs a harder shake to dislodge
-                let shake_threshold = 25.0 * self.scale;
+                let shake_threshold = 50.0 * self.scale;
                 let shaken = self.cursor_speed > shake_threshold;
                 if shaken || self.landed_timer > 2.0 {
                     self.state = FlyState::TakingOff;
@@ -213,6 +213,16 @@ impl Fly {
 
     pub fn is_landed(&self) -> bool {
         self.state == FlyState::Landed
+    }
+
+    /// Returns (dx, dy) to nudge the real OS cursor when landed. Evil.
+    pub fn cursor_drift(&self) -> Option<(i32, i32)> {
+        if self.state != FlyState::Landed {
+            return None;
+        }
+        let dx = rng().gen_range(-4..=4);
+        let dy = rng().gen_range(-4..=4);
+        Some((dx, dy))
     }
 
     fn random_edge_point(&self) -> (f32, f32) {
