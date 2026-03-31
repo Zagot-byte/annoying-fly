@@ -13,6 +13,9 @@ egui = "0.28"
 # Random number generation for fly behavior
 rand = "0.8"
 
+# PNG decoding for sprites
+image = { version = "0.24", features = ["png"] }
+
 [profile.dev]
 # Fast compile times for development
 opt-level = 0

@@ -20,19 +20,28 @@ fn main() -> Result<(), eframe::Error> {
         options,
         Box::new(|cc| {
             cc.egui_ctx.set_visuals(egui::Visuals::light());
-            Ok(Box::new(FlyApp::new()))
+            Ok(Box::new(FlyApp::new(cc)))
         }),
     )
 }
 
 struct FlyApp {
     fly: Fly,
+    idle_frames: Vec<egui::TextureHandle>,
 }
 
 impl FlyApp {
-    fn new() -> Self {
+    fn new(cc: &eframe::CreationContext) -> Self {
+        let idle_frames = vec![
+            load_texture(&cc.egui_ctx, "idle-1", include_bytes!("../sprit/idle-1.png")),
+            load_texture(&cc.egui_ctx, "idle-2", include_bytes!("../sprit/idle-2.png")),
+            load_texture(&cc.egui_ctx, "idle-3", include_bytes!("../sprit/idl-3.png")),
+            load_texture(&cc.egui_ctx, "idle-4", include_bytes!("../sprit/idle-4.png")),
+        ];
+
         Self {
             fly: Fly::new(400.0, 300.0),
+            idle_frames,
         }
     }
 }
@@ -46,31 +55,44 @@ impl eframe::App for FlyApp {
             self.fly.toggle_mode();
         }
 
-        // Keep fly aware of viewport size (for off-screen entry/exit)
+        // Keep fly aware of viewport size
         if let Some(rect) = ctx.input(|i| i.viewport().inner_rect) {
             self.fly.set_viewport(rect.width(), rect.height());
         }
 
-        // Feed cursor position into fly
+        // Feed cursor position
         if let Some(pos) = ctx.input(|i| i.pointer.latest_pos()) {
             self.fly.set_target(pos.x, pos.y);
         }
 
         self.fly.update(dt);
 
+        // Pick animation frame from wing_phase (0..TAU → 4 frames)
+        let frame_idx = (self.fly.wing_phase / std::f32::consts::TAU * 4.0) as usize % 4;
+        let current_frame = &self.idle_frames[frame_idx];
+
         egui::CentralPanel::default().show(ctx, |ui| {
             ui.label(format!(
-                "Mode: {:?}  State: {:?}  |  Ctrl+Shift+A to toggle",
-                self.fly.mode, self.fly.state,
-            ));
-            ui.label(format!(
-                "Cursor ({:.0},{:.0})  Fly ({:.0},{:.0})  Scale {:.2}",
-                self.fly.target_x, self.fly.target_y, self.fly.x, self.fly.y, self.fly.scale,
+                "Mode: {:?}  State: {:?}  Scale: {:.2}  |  Ctrl+Shift+A",
+                self.fly.mode, self.fly.state, self.fly.scale,
             ));
 
-            renderer::draw_fly(&self.fly, ui.painter());
+            renderer::draw_fly(&self.fly, ui.painter(), current_frame);
 
             ctx.request_repaint();
         });
     }
+}
+
+fn load_texture(ctx: &egui::Context, name: &str, bytes: &[u8]) -> egui::TextureHandle {
+    let img = image::load_from_memory(bytes)
+        .expect("failed to load sprite")
+        .to_rgba8();
+    let size = [img.width() as usize, img.height() as usize];
+    let pixels = img.into_raw();
+    ctx.load_texture(
+        name,
+        egui::ColorImage::from_rgba_unmultiplied(size, &pixels),
+        egui::TextureOptions::LINEAR,
+    )
 }
